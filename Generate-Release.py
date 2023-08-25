@@ -14,7 +14,7 @@ def should_ignore_file(fpath: str, files_to_ignore: List[str]) -> bool:
             return True
     return False
 
-def zip_files(zip_filename: str, dir_to_zip: str, files_to_ignore: List[str]) -> None:
+def zip_files(zip_filename: str, dir_to_zip: str, files_to_ignore: List[str], folders_to_ignore: List[str]) -> None:
     if os.path.exists(zip_filename):
         os.remove(zip_filename)
 
@@ -22,10 +22,10 @@ def zip_files(zip_filename: str, dir_to_zip: str, files_to_ignore: List[str]) ->
     for root, directories, files in os.walk(dir_to_zip):
         print(root)
         print(files)
+        if root in folders_to_ignore:
+            continue
         files = [os.path.join(root, x) for x in files]
-        print(files)
         files = [x for x in files if not should_ignore_file(x, files_to_ignore)]
-        print(files)
         files_to_zip.extend(files)
 
     with zipfile.ZipFile(zip_filename, 'w') as zipf:
@@ -45,5 +45,8 @@ if __name__ == "__main__":
             os.path.join(dir_to_zip, ".gitattributes"),
             os.path.join(dir_to_zip, ".gitignore"),
             os.path.join(dir_to_zip, "LICENSE"),
-        ]
+        ],
+        folders_to_ignore=[
+            ".git",
+        ],
     )
