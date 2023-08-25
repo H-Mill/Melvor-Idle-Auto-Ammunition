@@ -1,0 +1,58 @@
+{
+  "$schema": "https://melvoridle.com/assets/schema/gameData.json",
+  "namespace": "hm_auto_ammo",
+  "data": {
+    "shopPurchases": [
+      {
+        "id": "hm_auto_ammo_upgrade",
+        "category": "melvorF:Slayer",
+        "media": "assets/ammo-pouch.png",
+        "contains": {
+          "items": [],
+          "modifiers": {}
+        },
+        "cost": {
+          "gp": {
+            "type": "Fixed",
+            "cost": 50000000
+          },
+          "slayerCoins": {
+            "type": "Fixed",
+            "cost": 150000
+          },
+          "items": [],
+          "raidCoins": {
+            "type": "Fixed",
+            "cost": 0
+          }
+        },
+        "allowQuantityPurchase": false,
+        "unlockRequirements": [],
+        "purchaseRequirements": [
+          {
+            "type": "SkillLevel",
+            "skillID": "melvorD:Ranged",
+            "level": 50
+          },
+          {
+            "type": "SkillLevel",
+            "skillID": "melvorD:Slayer",
+            "level": 50
+          }
+        ],
+        "defaultBuyLimit": 1,
+        "buyLimitOverrides": [],
+        "showBuyLimit": false,
+        "customName": "Auto Ammunition",
+        "customDescription": "Automatically replace ammunition in your quiver while fighting. Convenient!"
+      }
+    ],
+    "shopDisplayOrder": [
+      {
+        "insertAt": "After",
+        "afterID": "melvorF:Auto_Slayer",
+        "ids": ["hm_auto_ammo:hm_auto_ammo_upgrade"]
+      }
+    ]
+  }
+}

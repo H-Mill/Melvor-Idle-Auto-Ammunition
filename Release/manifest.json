@@ -1,0 +1,6 @@
+{
+    "namespace": "hm_auto_ammo",
+    "icon": "assets/ammo-pouch.png",
+    "setup": "setup.mjs",
+    "load": ["src/autoAmmo.json", "src/ammoData.json"]
+}
