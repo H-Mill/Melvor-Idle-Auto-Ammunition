@@ -1,6 +1,6 @@
 const constant = {
     modTitle: 'Auto Ammo Mod',
-    verson: 1.1
+    verson: 1.2
 };
 const { modTitle } = constant;
 const ctx = mod.getContext(import.meta);
