@@ -45,6 +45,7 @@ if __name__ == "__main__":
             os.path.join(dir_to_zip, ".gitattributes"),
             os.path.join(dir_to_zip, ".gitignore"),
             os.path.join(dir_to_zip, "LICENSE"),
+            os.path.join(dir_to_zip, "web-icon"),
         ],
         folders_to_ignore=[
             ".git",
