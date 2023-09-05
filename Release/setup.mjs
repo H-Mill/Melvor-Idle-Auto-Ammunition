@@ -1,15 +1,197 @@
 const constant = {
 	modTitle: "Auto Ammo Mod",
-	verson: 1.3,
+	verson: 1.4,
 	modEnabledId: "mod-enabled",
+	enableArrowSwapId: "enable-arrow-swap",
+	enableBoltSwapId: "enable-bolt-swap",
+	enableKnifeSwapId: "enable-knife-swap",
+	enableJavelinSwapId: "enable-javelin-swap",
+	ammoTypeMap: {
+		arrow: "0",
+		bolt: "1",
+		javelin: "2",
+		knife: "3",
+	},
 };
 const { modTitle } = constant;
 const ctx = mod.getContext(import.meta);
 let ammoData;
 let swapType = null;
+let combatMenuIcon = null;
 
-function log(msg) {
-	console.log(`[${modTitle}]: ${msg}`);
+export async function setup({ loadData, onInterfaceReady }) {
+	setupSettings();
+	try {
+		populateAmmoData(loadData);
+	} catch (e) {
+		log(`issue loading ammo data: ${e}`);
+	}
+	ctx.patch(Character, "initializeForCombat").after(onInitializeForCombat);
+	ctx.patch(Player, "attack").before(onBeforeAttack);
+	ctx.patch(Player, "attack").after(onAfterAttack);
+
+	onInterfaceReady(() => {
+		const getColoredHtml = (text, success = false, successModifier = 'Enabled', failureModifier = 'Disabled') => `<p class="text-${success ? 'success' : 'danger'}">${text}: ${success ? successModifier : failureModifier}</p>`;
+		const formatInactiveTextIfNeeded = isPurchased => ('Enabled' + (!isPurchased ? ' <span class="text-danger">(Inactive)</span>' : ''));
+		let iconUrl = ctx.getResourceUrl('assets/ammo-pouch.png');
+		let purchasedElement = document.createElement('img');
+		purchasedElement.id = 'combat-menu-item-auto-ammo';
+		purchasedElement.src = iconUrl;
+		purchasedElement.className = 'combat-equip-img border-rounded-equip p-1 m-1 pointer-enabled'
+		purchasedElement.onclick = () => {
+			const _isModEnabled = isModEnabled();
+			const _isAutoAmmoPurchased = isAutoAmmoPurchased();
+			const _shouldAutoSwapArrows = shouldAutoSwapArrows();
+			const _shouldAutoSwapBolts = shouldAutoSwapBolts();
+			const _shouldAutoSwapKnives = shouldAutoSwapKnives();
+			const _shouldAutoSwapJavelins = shouldAutoSwapJavelins();
+			Swal.fire({
+				title: 'Auto Ammunition',
+				icon: iconUrl,
+				html: '<i style="font-size: 0.75rem;">These settings can be modified in the Mod Settings sidebar.</i>'
+					+ `<p>${getColoredHtml('Mod', _isModEnabled)}</p>`
+					+ `<p>${getColoredHtml('Upgrade', _isAutoAmmoPurchased, 'Purchased', 'Not Purchased')}</p>`
+					+ `<p>${getColoredHtml('Auto Arrows', _shouldAutoSwapArrows, formatInactiveTextIfNeeded(_isAutoAmmoPurchased))}</p>`
+					+ `<p>${getColoredHtml('Auto Bolts', _shouldAutoSwapBolts, formatInactiveTextIfNeeded(_isAutoAmmoPurchased))}</p>`
+					+ `<p>${getColoredHtml('Auto Knives', _shouldAutoSwapKnives, formatInactiveTextIfNeeded(_isAutoAmmoPurchased))}</p>`
+					+ `<p>${getColoredHtml('Auto Javelins', _shouldAutoSwapJavelins, formatInactiveTextIfNeeded(_isAutoAmmoPurchased))}</p>`,
+				showCloseButton: true
+			});
+		}
+	
+		const combatMenuItems = document.querySelectorAll('[id^=combat-menu-item-]');
+		const lastMenuItem = combatMenuItems[combatMenuItems.length-1];
+		lastMenuItem.after(purchasedElement);
+		combatMenuIcon = purchasedElement;
+		tippy(purchasedElement, {
+			content: 'Auto Ammunition',
+			placement: 'bottom',
+			interactive: false,
+			animation: false,
+		});
+    });
+	log("loaded!");
+}
+
+function setupSettings() {
+	const {
+		modEnabledId,
+		enableArrowSwapId,
+		enableBoltSwapId,
+		enableKnifeSwapId,
+		enableJavelinSwapId,
+	} = constant;
+	const generalSection = ctx.settings.section("General");
+	generalSection.add({
+		type: "switch",
+		name: modEnabledId,
+		label: "Enable Mod",
+		hint: "Enable mod functionality.",
+		default: true,
+	});
+
+	generalSection.add({
+		type: "switch",
+		name: enableArrowSwapId,
+		label: "Auto Arrows",
+		hint: "Automatically equip arrows during combat when a bow is equipped.",
+		default: true,
+	});
+
+	generalSection.add({
+		type: "switch",
+		name: enableBoltSwapId,
+		label: "Auto Bolts",
+		hint: "Automatically equip bolts during combat when a crossbow is equipped.",
+		default: true,
+	});
+
+	generalSection.add({
+		type: "switch",
+		name: enableKnifeSwapId,
+		label: "Auto Knives",
+		hint: "Automatically equip knives during combat when knives are equipped (knives must be manually equipped at the start!).",
+		default: true,
+	});
+
+	generalSection.add({
+		type: "switch",
+		name: enableJavelinSwapId,
+		label: "Auto Javelins",
+		hint: "Automatically equip javelins during combat when javelins are equipped (javelins must be manually equipped at the start!).",
+		default: true,
+	});
+}
+
+function onInitializeForCombat() {
+	try {
+		if (!isModEnabled()) return;
+		if (!isAutoAmmoPurchased()) return;
+		if (!isRangedAttack()) return;
+		if (!settingShouldAutoSwap()) return;
+		if (!shouldEquipAmmoOnInitializeCombat()) return;
+
+		setSwapType(getAmmoType());
+		autoEquipAmmo();
+	} catch (e) {
+		error(`issue during initializeForCombat: ${e}`);
+	}
+}
+
+function shouldEquipAmmoOnInitializeCombat() {
+	const quiver = game.combat.player.equipment.slots.Quiver;
+	const ammoType = getAmmoType();
+	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
+	if (ammoType === javelin) return false;
+	if (ammoType === knife) return false;
+
+	if (ammoType === arrow) {
+		if(equippedAmmoMatchesType(arrow))
+			return quiver.quantity === 0;
+		return true;
+	}
+	else if (ammoType === bolt){
+		if(equippedAmmoMatchesType(bolt))
+			return quiver.quantity === 0;
+		return true;
+	} 
+
+	return false;
+}
+
+function equippedAmmoMatchesType(expectedAmmoType) {
+	const quiver = game.combat.player.equipment.slots.Quiver;
+	return quiver.item.ammoType === expectedAmmoType;
+}
+
+function onBeforeAttack() {
+	try {
+		if (!isModEnabled()) return;
+		if (!isAutoAmmoPurchased()) return;
+		if (!isRangedAttack()) return;
+		if (!settingShouldAutoSwap()) return;
+		
+
+		const quiver = game.combat.player.equipment.slots.Quiver;
+		if (quiver.quantity > 1) return;
+
+		setSwapType(getAmmoType());
+	} catch (e) {
+		error(`issue during attack(before): ${e}`);
+	}
+}
+
+function onAfterAttack() {
+	try {
+		if (!isModEnabled()) return;
+		if (!isAutoAmmoPurchased()) return;
+		if (!shouldAutoEquip()) return;
+		if (!settingShouldAutoSwap()) return;
+
+		autoEquipAmmo();
+	} catch (e) {
+		error(`issue during attack(after): ${e}`);
+	}
 }
 
 async function populateAmmoData(loadData) {
@@ -23,6 +205,12 @@ async function populateAmmoData(loadData) {
 		}
 		ammoData.set(i + "", ammoDataType);
 	}
+}
+
+function isAutoAmmoPurchased() {
+	return [...game.shop.upgradesPurchased.keys()].some(
+		(p) => p._localID === "hm_auto_ammo_upgrade"
+	);
 }
 
 function setSwapType(typeValue) {
@@ -43,11 +231,11 @@ function resetSwapType() {
 
 function getAmmoType() {
 	const equipmentSlots = game.combat.player.equipment.slots;
-	return (
+	let type =
 		equipmentSlots.Weapon.item.ammoTypeRequired ??
 		equipmentSlots.Quiver.item.ammoType ??
-		getSwapType()
-	);
+		getSwapType();
+	return type + "";
 }
 
 function isRangedAttack() {
@@ -83,14 +271,6 @@ function autoEquipAmmo() {
 	resetSwapType();
 }
 
-function error(msg) {
-	toast(
-		`${constant.modTitle} experienced an error. It will be fixed ASAP, ${game.characterName} :). If this error persists go ahead and disable the mod via settings until a fix is available!`,
-		5000
-	);
-	log(`issue during initializeForCombat: ${msg}`);
-}
-
 function toast(text, duration = 2000) {
 	Toastify({
 		text,
@@ -102,77 +282,49 @@ function toast(text, duration = 2000) {
 	}).showToast();
 }
 
-function isModEnabled() {
-	return ctx.settings.section("General").get(constant.modEnabledId);
+function getGeneralSettings() {
+	return ctx.settings.section("General");
 }
 
-export async function setup({ loadData }) {
-	ctx.settings.section("General").add({
-		type: "switch",
-		name: constant.modEnabledId,
-		label: "Enable Mod",
-		hint: "Automatically equip ammo before/during combat for the equipped ranged weapon.",
-		default: true,
-	});
+function isModEnabled() {
+	return getGeneralSettings().get(constant.modEnabledId);
+}
 
-	try {
-		populateAmmoData(loadData);
-	} catch (e) {
-		log(`issue loading ammo data: ${e}`);
-	}
+function shouldAutoSwapArrows() {
+	return getGeneralSettings().get(constant.enableArrowSwapId);
+}
 
-	ctx.patch(Character, "initializeForCombat").after(function () {
-		try {
-			if (!isModEnabled) return;
-			if (!isRangedAttack()) return;
+function shouldAutoSwapBolts() {
+	return getGeneralSettings().get(constant.enableBoltSwapId);
+}
 
-			const weapon = game.combat.player.equipment.slots.Weapon;
-			const quiver = game.combat.player.equipment.slots.Quiver;
-			if (
-				(weapon.item.ammoTypeRequired !== 0 &&
-					quiver.item.ammoType !== 0 &&
-					quiver.quantity >= 1) ||
-				(weapon.item.ammoTypeRequired !== 1 &&
-					quiver.item.ammoType !== 1 &&
-					quiver.quantity >= 1)
-			)
-				return;
+function shouldAutoSwapKnives() {
+	return getGeneralSettings().get(constant.enableKnifeSwapId);
+}
 
-			setSwapType(getAmmoType());
-			autoEquipAmmo();
-		} catch (e) {
-			error(`issue during initializeForCombat: ${e}`);
-		}
-	});
+function shouldAutoSwapJavelins() {
+	return getGeneralSettings().get(constant.enableJavelinSwapId);
+}
 
-	ctx.patch(Player, "attack").before(function () {
-		try {
-			if (!isModEnabled) return;
-			if (!isRangedAttack()) return;
+function settingShouldAutoSwap() {
+	const ammoType = getAmmoType();
+	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
+	if (ammoType === arrow) return shouldAutoSwapArrows();
+	else if (ammoType === bolt) return shouldAutoSwapBolts();
+	else if (ammoType === javelin) return shouldAutoSwapJavelins();
+	else if (ammoType === knife) return shouldAutoSwapKnives();
 
-			const autoAmmoPurchased = [
-				...game.shop.upgradesPurchased.keys(),
-			].some((p) => p._localID === "hm_auto_ammo_upgrade");
-			if (!autoAmmoPurchased) return;
+	return false;
+}
 
-			const quiver = game.combat.player.equipment.slots.Quiver;
-			if (quiver.quantity > 1) return;
+function log(msg) {
+	console.log(`[${modTitle}]: ${msg}`);
+}
 
-			setSwapType(getAmmoType());
-		} catch (e) {
-			error(`issue during attack(before): ${e}`);
-		}
-	});
-
-	ctx.patch(Player, "attack").after(function () {
-		try {
-			if (!isModEnabled) return;
-			if (!shouldAutoEquip()) return;
-
-			autoEquipAmmo();
-		} catch (e) {
-			error(`issue during attack(after): ${e}`);
-		}
-	});
-	log("loaded!");
+function error(msg) {
+	toast(
+		`${constant.modTitle} experienced an error. It will be fixed ASAP, ${game.characterName} :). If this error persists go ahead and disable the mod via settings until a fix is available!`,
+		5000
+	);
+	log(`issue during initializeForCombat: ${msg}`);
 }
