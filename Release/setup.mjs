@@ -17,8 +17,9 @@ const { modTitle } = constant;
 const ctx = mod.getContext(import.meta);
 let ammoData;
 let swapType = null;
+let combatMenuIcon = null;
 
-export async function setup({ loadData }) {
+export async function setup({ loadData, onInterfaceReady }) {
 	setupSettings();
 	try {
 		populateAmmoData(loadData);
@@ -28,6 +29,45 @@ export async function setup({ loadData }) {
 	ctx.patch(Character, "initializeForCombat").after(onInitializeForCombat);
 	ctx.patch(Player, "attack").before(onBeforeAttack);
 	ctx.patch(Player, "attack").after(onAfterAttack);
+
+	onInterfaceReady(() => {
+		const getColoredHtml = (text, success = false, successModifier = 'Enabled', failureModifier = 'Disabled') => `<p class="text-${success ? 'success' : 'danger'}">${text}: ${success ? successModifier : failureModifier}</p>`;
+		let iconUrl = ctx.getResourceUrl('assets/ammo-pouch.png');
+		let purchasedElement = document.createElement('img');
+		purchasedElement.id = 'combat-menu-item-auto-ammo';
+		purchasedElement.src = iconUrl;
+		purchasedElement.className = 'combat-equip-img border-rounded-equip p-1 m-1 pointer-enabled'
+		purchasedElement.onclick = () => {
+			const _isModEnabled = isModEnabled();
+			const _isAutoAmmoPurchased = isAutoAmmoPurchased();
+			const _shouldAutoSwapArrows = shouldAutoSwapArrows();
+			const _shouldAutoSwapBolts = shouldAutoSwapBolts();
+			const _shouldAutoSwapKnives = shouldAutoSwapKnives();
+			const _shouldAutoSwapJavelins = shouldAutoSwapJavelins();
+			Swal.fire({
+				title: 'Auto Ammunition',
+				icon: iconUrl,
+				html: `<p>${getColoredHtml('Mod', _isModEnabled)}</p>`
+					+ `<p>${getColoredHtml('Upgrade', _isAutoAmmoPurchased, 'Purchased', 'Not Purchased')}</p>`
+					+ `<p>${getColoredHtml('Auto Arrows', _shouldAutoSwapArrows)}</p>`
+					+ `<p>${getColoredHtml('Auto Bolts', _shouldAutoSwapBolts)}</p>`
+					+ `<p>${getColoredHtml('Auto Knives', _shouldAutoSwapKnives)}</p>`
+					+ `<p>${getColoredHtml('Auto Javelins', _shouldAutoSwapJavelins)}</p>`,
+				showCloseButton: true
+			});
+		}
+	
+		const combatMenuItems = document.querySelectorAll('[id^=combat-menu-item-]');
+		const lastMenuItem = combatMenuItems[combatMenuItems.length-1];
+		lastMenuItem.after(purchasedElement);
+		combatMenuIcon = purchasedElement;
+		tippy(purchasedElement, {
+			content: 'Auto Ammunition',
+			placement: 'bottom',
+			interactive: false,
+			animation: false,
+		});
+    });
 	log("loaded!");
 }
 
