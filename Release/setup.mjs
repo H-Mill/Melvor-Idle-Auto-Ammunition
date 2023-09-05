@@ -47,7 +47,8 @@ export async function setup({ loadData, onInterfaceReady }) {
 			Swal.fire({
 				title: 'Auto Ammunition',
 				icon: iconUrl,
-				html: `<p>${getColoredHtml('Mod', _isModEnabled)}</p>`
+				html: '<i style="font-size: 0.75rem;">These settings can be modified in the Mod Settings sidebar.</i>'
+					+ `<p>${getColoredHtml('Mod', _isModEnabled)}</p>`
 					+ `<p>${getColoredHtml('Upgrade', _isAutoAmmoPurchased, 'Purchased', 'Not Purchased')}</p>`
 					+ `<p>${getColoredHtml('Auto Arrows', _shouldAutoSwapArrows)}</p>`
 					+ `<p>${getColoredHtml('Auto Bolts', _shouldAutoSwapBolts)}</p>`
