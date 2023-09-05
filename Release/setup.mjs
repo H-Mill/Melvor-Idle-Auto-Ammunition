@@ -32,6 +32,7 @@ export async function setup({ loadData, onInterfaceReady }) {
 
 	onInterfaceReady(() => {
 		const getColoredHtml = (text, success = false, successModifier = 'Enabled', failureModifier = 'Disabled') => `<p class="text-${success ? 'success' : 'danger'}">${text}: ${success ? successModifier : failureModifier}</p>`;
+		const formatInactiveTextIfNeeded = isPurchased => ('Enabled' + (!isPurchased ? ' <span class="text-danger">(Inactive)</span>' : ''));
 		let iconUrl = ctx.getResourceUrl('assets/ammo-pouch.png');
 		let purchasedElement = document.createElement('img');
 		purchasedElement.id = 'combat-menu-item-auto-ammo';
@@ -50,10 +51,10 @@ export async function setup({ loadData, onInterfaceReady }) {
 				html: '<i style="font-size: 0.75rem;">These settings can be modified in the Mod Settings sidebar.</i>'
 					+ `<p>${getColoredHtml('Mod', _isModEnabled)}</p>`
 					+ `<p>${getColoredHtml('Upgrade', _isAutoAmmoPurchased, 'Purchased', 'Not Purchased')}</p>`
-					+ `<p>${getColoredHtml('Auto Arrows', _shouldAutoSwapArrows)}</p>`
-					+ `<p>${getColoredHtml('Auto Bolts', _shouldAutoSwapBolts)}</p>`
-					+ `<p>${getColoredHtml('Auto Knives', _shouldAutoSwapKnives)}</p>`
-					+ `<p>${getColoredHtml('Auto Javelins', _shouldAutoSwapJavelins)}</p>`,
+					+ `<p>${getColoredHtml('Auto Arrows', _shouldAutoSwapArrows, formatInactiveTextIfNeeded(_isAutoAmmoPurchased))}</p>`
+					+ `<p>${getColoredHtml('Auto Bolts', _shouldAutoSwapBolts, formatInactiveTextIfNeeded(_isAutoAmmoPurchased))}</p>`
+					+ `<p>${getColoredHtml('Auto Knives', _shouldAutoSwapKnives, formatInactiveTextIfNeeded(_isAutoAmmoPurchased))}</p>`
+					+ `<p>${getColoredHtml('Auto Javelins', _shouldAutoSwapJavelins, formatInactiveTextIfNeeded(_isAutoAmmoPurchased))}</p>`,
 				showCloseButton: true
 			});
 		}
