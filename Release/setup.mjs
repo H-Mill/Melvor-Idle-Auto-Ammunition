@@ -142,17 +142,15 @@ function shouldEquipAmmoOnInitializeCombat() {
 	const quiver = game.combat.player.equipment.slots.Quiver;
 	const ammoType = getAmmoType();
 	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
-	if (ammoType === javelin) return false;
-	if (ammoType === knife) return false;
+	if (ammoType == javelin) return false;
+	if (ammoType == knife) return false;
 
-	if (ammoType === arrow) {
-		if(equippedAmmoMatchesType(arrow))
-			return quiver.quantity === 0;
+	const quiver = getQuiver();
+	if (ammoType == arrow) {
+		if (equippedAmmoMatchesType(arrow)) return quiver.quantity === 0;
 		return true;
-	}
-	else if (ammoType === bolt){
-		if(equippedAmmoMatchesType(bolt))
-			return quiver.quantity === 0;
+	} else if (ammoType == bolt) {
+		if (equippedAmmoMatchesType(bolt)) return quiver.quantity === 0;
 		return true;
 	} 
 
@@ -160,38 +158,7 @@ function shouldEquipAmmoOnInitializeCombat() {
 }
 
 function equippedAmmoMatchesType(expectedAmmoType) {
-	const quiver = game.combat.player.equipment.slots.Quiver;
-	return quiver.item.ammoType === expectedAmmoType;
-}
-
-function onBeforeAttack() {
-	try {
-		if (!isModEnabled()) return;
-		if (!isAutoAmmoPurchased()) return;
-		if (!isRangedAttack()) return;
-		if (!settingShouldAutoSwap()) return;
-		
-
-		const quiver = game.combat.player.equipment.slots.Quiver;
-		if (quiver.quantity > 1) return;
-
-		setSwapType(getAmmoType());
-	} catch (e) {
-		error(`issue during attack(before): ${e}`);
-	}
-}
-
-function onAfterAttack() {
-	try {
-		if (!isModEnabled()) return;
-		if (!isAutoAmmoPurchased()) return;
-		if (!shouldAutoEquip()) return;
-		if (!settingShouldAutoSwap()) return;
-
-		autoEquipAmmo();
-	} catch (e) {
-		error(`issue during attack(after): ${e}`);
-	}
+	return getQuiver().item.ammoType == expectedAmmoType;
 }
 
 async function populateAmmoData(loadData) {
@@ -214,7 +181,7 @@ function isAutoAmmoPurchased() {
 }
 
 function setSwapType(typeValue) {
-	swapType = typeValue + "";
+	swapType = typeValue;
 }
 
 function getSwapType() {
@@ -235,7 +202,7 @@ function getAmmoType() {
 		equipmentSlots.Weapon.item.ammoTypeRequired ??
 		equipmentSlots.Quiver.item.ammoType ??
 		getSwapType();
-	return type + "";
+	return type;
 }
 
 function isRangedAttack() {
@@ -309,10 +276,10 @@ function shouldAutoSwapJavelins() {
 function settingShouldAutoSwap() {
 	const ammoType = getAmmoType();
 	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
-	if (ammoType === arrow) return shouldAutoSwapArrows();
-	else if (ammoType === bolt) return shouldAutoSwapBolts();
-	else if (ammoType === javelin) return shouldAutoSwapJavelins();
-	else if (ammoType === knife) return shouldAutoSwapKnives();
+	if (ammoType == arrow) return shouldAutoSwapArrows();
+	else if (ammoType == bolt) return shouldAutoSwapBolts();
+	else if (ammoType == javelin) return shouldAutoSwapJavelins();
+	else if (ammoType == knife) return shouldAutoSwapKnives();
 
 	return false;
 }
