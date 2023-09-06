@@ -1,8 +1,7 @@
 const constant = {
 	modTitle: "Auto Ammo Mod",
-	verson: 1.4,
+	verson: "1.4.2",
 	id: {
-		storage: "auto-ammo-storage",
 		modEnabledId: "mod-enabled",
 		enableArrowSwapId: "enable-arrow-swap",
 		enableBoltSwapId: "enable-bolt-swap",
@@ -236,14 +235,14 @@ function setupSettings() {
 function shouldEquipAmmoOnInitializeCombat() {
 	const ammoType = getAmmoType();
 	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
-	if (ammoType === javelin) return false;
-	if (ammoType === knife) return false;
+	if (ammoType == javelin) return false;
+	if (ammoType == knife) return false;
 
 	const quiver = getQuiver();
-	if (ammoType === arrow) {
+	if (ammoType == arrow) {
 		if (equippedAmmoMatchesType(arrow)) return quiver.quantity === 0;
 		return true;
-	} else if (ammoType === bolt) {
+	} else if (ammoType == bolt) {
 		if (equippedAmmoMatchesType(bolt)) return quiver.quantity === 0;
 		return true;
 	}
@@ -252,7 +251,7 @@ function shouldEquipAmmoOnInitializeCombat() {
 }
 
 function equippedAmmoMatchesType(expectedAmmoType) {
-	return getQuiver().item.ammoType === expectedAmmoType;
+	return getQuiver().item.ammoType == expectedAmmoType;
 }
 
 async function populateAmmoData(loadData) {
@@ -279,7 +278,7 @@ function isAutoAmmoPurchased() {
 }
 
 function setSwapType(typeValue) {
-	swapType = typeValue + "";
+	swapType = typeValue;
 }
 
 function getSwapType() {
@@ -299,7 +298,7 @@ function getAmmoType() {
 		getWeapon().item.ammoTypeRequired ??
 		getQuiver().item.ammoType ??
 		getSwapType();
-	return type + "";
+	return type;
 }
 
 function isRangedAttack() {
@@ -369,10 +368,10 @@ function shouldAutoSwapJavelins() {
 function settingShouldAutoSwap() {
 	const ammoType = getAmmoType();
 	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
-	if (ammoType === arrow) return shouldAutoSwapArrows();
-	else if (ammoType === bolt) return shouldAutoSwapBolts();
-	else if (ammoType === javelin) return shouldAutoSwapJavelins();
-	else if (ammoType === knife) return shouldAutoSwapKnives();
+	if (ammoType == arrow) return shouldAutoSwapArrows();
+	else if (ammoType == bolt) return shouldAutoSwapBolts();
+	else if (ammoType == javelin) return shouldAutoSwapJavelins();
+	else if (ammoType == knife) return shouldAutoSwapKnives();
 
 	return false;
 }
@@ -406,11 +405,13 @@ function generateToastHtml(text) {
 	return (
 		'<div style="display: flex; flex-direction: column;background: #404040;padding: 1rem;margin: 0 5px;max-width: 50vw;">' +
 		'<div style="background: #404040;padding: 0 0 0.5rem 0;display: flex;flex-direction: row; align-items: center;">' +
-		(modIcon ? `<img src="${modIcon}" style="width: 32px;height: 32px;margin-right: 1rem;"></img>` : '') +
+		(modIcon
+			? `<img src="${modIcon}" style="width: 32px;height: 32px;margin-right: 1rem;"></img>`
+			: "") +
 		`<span style="justify-self: center;">${constant.friendlyTitle.mod}</span>` +
 		"</div>" +
 		`<span style="margin: auto;">${text}</span>` +
-		'</div>'
+		"</div>"
 	);
 }
 
