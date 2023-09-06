@@ -405,11 +405,13 @@ function generateToastHtml(text) {
 	return (
 		'<div style="display: flex; flex-direction: column;background: #404040;padding: 1rem;margin: 0 5px;max-width: 50vw;">' +
 		'<div style="background: #404040;padding: 0 0 0.5rem 0;display: flex;flex-direction: row; align-items: center;">' +
-		(modIcon ? `<img src="${modIcon}" style="width: 32px;height: 32px;margin-right: 1rem;"></img>` : '') +
+		(modIcon
+			? `<img src="${modIcon}" style="width: 32px;height: 32px;margin-right: 1rem;"></img>`
+			: "") +
 		`<span style="justify-self: center;">${constant.friendlyTitle.mod}</span>` +
 		"</div>" +
 		`<span style="margin: auto;">${text}</span>` +
-		'</div>'
+		"</div>"
 	);
 }
 
