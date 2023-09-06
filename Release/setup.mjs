@@ -1,6 +1,6 @@
 const constant = {
 	modTitle: "Auto Ammo Mod",
-	verson: 1.4,
+	verson: "1.4.2",
 	modEnabledId: "mod-enabled",
 	enableArrowSwapId: "enable-arrow-swap",
 	enableBoltSwapId: "enable-bolt-swap",
