@@ -387,7 +387,7 @@ function getWeapon() {
 
 function error(text) {
 	log(text);
-	toast(text, 0);
+	toast(text, 5000);
 }
 
 function toast(text, duration = 2000) {
