@@ -1,43 +1,56 @@
 const constant = {
 	modTitle: "Auto Ammo Mod",
-	verson: "1.4.2",
+	verson: "1.5.0",
 	id: {
 		modEnabledId: "mod-enabled",
 		enableArrowSwapId: "enable-arrow-swap",
 		enableBoltSwapId: "enable-bolt-swap",
 		enableKnifeSwapId: "enable-knife-swap",
 		enableJavelinSwapId: "enable-javelin-swap",
+		swapPriorityId: "swap-priority",
+		highToLowId: "highToLow", //this should match friendlyTitle prop
+		lowToHighId: "lowToHigh", //this should match friendlyTitle prop
+		arrowsId: "Arrows",
+		boltsId: "Bolts",
+		knivesId: "Knife",
+		javelinsId: "Javelin",
 	},
 	friendlyTitle: {
 		mod: "Auto Ammunition",
-	},
-	ammoTypeMap: {
-		arrow: "0",
-		bolt: "1",
-		javelin: "2",
-		knife: "3",
+		autoArrows: "Auto Arrows",
+		autoBolts: "Auto Bolts",
+		autoKnives: "Auto Knives",
+		autoJavelins: "Auto Javelins",
+		swapPriority: "Swap Priority",
+		highToLow: "High to Low", //this should match id prop
+		lowToHigh: "Low to High", //this should match id prop
 	},
 };
 const ctx = mod.getContext(import.meta);
-let ammoData;
 let modIcon, ammoPouchIcon;
+let ammoData = {},
+	ammoTypeMap = {};
 let swapType = null;
 
-export async function setup({ onInterfaceReady, loadData }) {
+export function setup({ onCharacterLoaded, onInterfaceReady }) {
 	try {
 		setupGlobals();
 		setupSettings();
-		populateAmmoData(loadData);
 		ctx.patch(Character, "initializeForCombat").after(
 			onInitializeForCombat
 		);
 		ctx.patch(Player, "attack").before(onBeforeAttack);
 		ctx.patch(Player, "attack").after(onAfterAttack);
+		onCharacterLoaded(onCharLoaded);
 		onInterfaceReady(onUiReady);
 		log("loaded!");
 	} catch (e) {
 		error(e);
 	}
+}
+
+function onCharLoaded() {
+	populateAmmoData();
 }
 
 function onUiReady() {
@@ -49,9 +62,9 @@ function onUiReady() {
 			successModifier = "Enabled",
 			failureModifier = "Disabled"
 		) =>
-			`<p class="text-${success ? "success" : "danger"}">${text}: ${
+			`<p>${text}: <span class="text-${success ? "success" : "danger"}">${
 				success ? successModifier : failureModifier
-			}</p>`;
+			}</span></p>`;
 		const formatInactiveTextIfNeeded = (isPurchased) =>
 			"Enabled" +
 			(!isPurchased
@@ -83,25 +96,30 @@ function onUiReady() {
 							"Not Purchased"
 						)}</p>` +
 						`<p>${getColoredHtml(
-							"Auto Arrows",
+							friendlyTitle.autoArrows,
 							_shouldAutoSwapArrows,
 							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
 						)}</p>` +
 						`<p>${getColoredHtml(
-							"Auto Bolts",
+							friendlyTitle.autoBolts,
 							_shouldAutoSwapBolts,
 							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
 						)}</p>` +
 						`<p>${getColoredHtml(
-							"Auto Knives",
+							friendlyTitle.autoKnives,
 							_shouldAutoSwapKnives,
 							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
 						)}</p>` +
 						`<p>${getColoredHtml(
-							"Auto Javelins",
+							friendlyTitle.autoJavelins,
 							_shouldAutoSwapJavelins,
 							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
-						)}</p>`,
+						)}</p>` +
+						`<p>${
+							friendlyTitle.swapPriority
+						}: <span class="text-success">${
+							constant.friendlyTitle[getSwapPriority()]
+						}</span></p>`,
 					showCloseButton: true,
 				});
 			} catch (e) {
@@ -186,7 +204,19 @@ function setupSettings() {
 			enableBoltSwapId,
 			enableKnifeSwapId,
 			enableJavelinSwapId,
+			swapPriorityId,
+			highToLowId,
+			lowToHighId,
 		} = constant.id;
+		const {
+			autoArrows,
+			autoBolts,
+			autoKnives,
+			autoJavelins,
+			swapPriority,
+			highToLow,
+			lowToHigh,
+		} = constant.friendlyTitle;
 		const generalSection = ctx.settings.section("General");
 		generalSection.add({
 			type: "switch",
@@ -199,7 +229,7 @@ function setupSettings() {
 		generalSection.add({
 			type: "switch",
 			name: enableArrowSwapId,
-			label: "Auto Arrows",
+			label: autoArrows,
 			hint: "Automatically equip arrows during combat when a bow is equipped.",
 			default: true,
 		});
@@ -207,7 +237,7 @@ function setupSettings() {
 		generalSection.add({
 			type: "switch",
 			name: enableBoltSwapId,
-			label: "Auto Bolts",
+			label: autoBolts,
 			hint: "Automatically equip bolts during combat when a crossbow is equipped.",
 			default: true,
 		});
@@ -215,7 +245,7 @@ function setupSettings() {
 		generalSection.add({
 			type: "switch",
 			name: enableKnifeSwapId,
-			label: "Auto Knives",
+			label: autoKnives,
 			hint: "Automatically equip knives during combat when knives are equipped (knives must be manually equipped at the start!).",
 			default: true,
 		});
@@ -223,9 +253,27 @@ function setupSettings() {
 		generalSection.add({
 			type: "switch",
 			name: enableJavelinSwapId,
-			label: "Auto Javelins",
+			label: autoJavelins,
 			hint: "Automatically equip javelins during combat when javelins are equipped (javelins must be manually equipped at the start!).",
 			default: true,
+		});
+
+		generalSection.add({
+			type: "dropdown",
+			name: swapPriorityId,
+			label: swapPriority,
+			hint: "The priority of what order to swap ammunition (high to low, or low to high).",
+			options: [
+				{
+					value: highToLowId,
+					display: highToLow,
+				},
+				{
+					value: lowToHighId,
+					display: lowToHigh,
+				},
+			],
+			default: highToLowId,
 		});
 	} catch (e) {
 		error(e);
@@ -234,16 +282,19 @@ function setupSettings() {
 
 function shouldEquipAmmoOnInitializeCombat() {
 	const ammoType = getAmmoType();
-	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
-	if (ammoType == javelin) return false;
-	if (ammoType == knife) return false;
+	const { arrowsId, boltsId, knivesId, javelinsId } = constant.id;
+
+	if (ammoType == ammoTypeMap[knivesId]) return false;
+	if (ammoType == ammoTypeMap[javelinsId]) return false;
 
 	const quiver = getQuiver();
-	if (ammoType == arrow) {
-		if (equippedAmmoMatchesType(arrow)) return quiver.quantity === 0;
+	const arrowType = ammoTypeMap[arrowsId];
+	const boltType = ammoTypeMap[boltsId];
+	if (ammoType == arrowType) {
+		if (equippedAmmoMatchesType(arrowType)) return quiver.quantity === 0;
 		return true;
-	} else if (ammoType == bolt) {
-		if (equippedAmmoMatchesType(bolt)) return quiver.quantity === 0;
+	} else if (ammoType == boltType) {
+		if (equippedAmmoMatchesType(boltType)) return quiver.quantity === 0;
 		return true;
 	}
 
@@ -254,18 +305,33 @@ function equippedAmmoMatchesType(expectedAmmoType) {
 	return getQuiver().item.ammoType == expectedAmmoType;
 }
 
-async function populateAmmoData(loadData) {
-	try {
-		ammoData = await loadData("src/ammoData.json");
-		ammoData = new Map(Object.entries(ammoData));
-		for (let i = 0; i < ammoData.size; i++) {
-			let ammoDataType = ammoData.get(i + "");
-			for (let j = 0; j < ammoDataType.length; j++) {
-				let item = game.items.getObjectByID(ammoDataType[j + ""]);
-				ammoDataType[j] = item;
-			}
-			ammoData.set(i + "", ammoDataType);
+function populateAmmoData() {
+	const selectEquipment = (loadedAmmo, parsedEquipment) => {
+		for (let i = 0; i < loadedAmmo.length; i++) {
+			let equipmentArray = loadedAmmo[i];
+			parsedEquipment.push(equipmentArray[equipmentArray.length - 1]);
 		}
+	};
+	const selectAmmoType = (equipmentItem) => equipmentItem.ammoType;
+	const setAmmoData = (ammoId, ammo) => (ammoData[ammoId] = ammo);
+	const setAmmoTypeMap = (filter, ammoId) => (ammoTypeMap[filter] = ammoId);
+	const loadAmmoType = (filter) => {
+		let loadedAmmo = Array.from(
+			game.items.equipment.registeredObjects
+		).filter((x) => x[0].includes(filter));
+		let parsedEquipment = [];
+		selectEquipment(loadedAmmo, parsedEquipment);
+		const ammoId = selectAmmoType(parsedEquipment[0]);
+		setAmmoData(ammoId, parsedEquipment);
+		setAmmoTypeMap(filter, ammoId);
+	};
+	try {
+		const { arrowsId, boltsId, knivesId, javelinsId } = constant.id;
+
+		loadAmmoType(arrowsId);
+		loadAmmoType(boltsId);
+		loadAmmoType(knivesId);
+		loadAmmoType(javelinsId);
 	} catch (e) {
 		error(e);
 	}
@@ -307,8 +373,8 @@ function isRangedAttack() {
 
 function autoEquipAmmo() {
 	const ammoType = getAmmoType();
-	const ammoChoices = ammoData
-		.get(ammoType + "")
+	const ammoChoices = ammoData[ammoType]
+		.sort(getSort())
 		.filter(
 			(c) =>
 				c.equipRequirements !== null &&
@@ -331,6 +397,25 @@ function autoEquipAmmo() {
 	}
 
 	resetSwapType();
+}
+
+function getSort() {
+	const sortProperty = "rangedStrengthBonus";
+	const swapPriority = getSwapPriority();
+	const highToLowSort = (a, b) =>
+		b.equipmentStats.find((x) => x.key === sortProperty).value -
+		a.equipmentStats.find((x) => x.key === sortProperty).value;
+	const lowToHighSort = (a, b) =>
+		a.equipmentStats.find((x) => x.key === sortProperty).value -
+		b.equipmentStats.find((x) => x.key === sortProperty).value;
+	const { highToLowId, lowToHighId } = constant.id;
+	switch (swapPriority) {
+		case highToLowId:
+			return highToLowSort;
+		case lowToHighId:
+			return lowToHighSort;
+	}
+	return highToLowSort;
 }
 
 function getAmmoPouchIcon() {
@@ -365,13 +450,19 @@ function shouldAutoSwapJavelins() {
 	return getGeneralSettings().get(constant.id.enableJavelinSwapId);
 }
 
+function getSwapPriority() {
+	return getGeneralSettings().get(constant.id.swapPriorityId);
+}
+
 function settingShouldAutoSwap() {
 	const ammoType = getAmmoType();
-	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
-	if (ammoType == arrow) return shouldAutoSwapArrows();
-	else if (ammoType == bolt) return shouldAutoSwapBolts();
-	else if (ammoType == javelin) return shouldAutoSwapJavelins();
-	else if (ammoType == knife) return shouldAutoSwapKnives();
+	const { arrowsId, boltsId, knivesId, javelinsId } = constant.id;
+
+	if (ammoType == ammoTypeMap[arrowsId]) return shouldAutoSwapArrows();
+	else if (ammoType == ammoTypeMap[boltsId]) return shouldAutoSwapBolts();
+	else if (ammoType == ammoTypeMap[javelinsId])
+		return shouldAutoSwapJavelins();
+	else if (ammoType == ammoTypeMap[knivesId]) return shouldAutoSwapKnives();
 
 	return false;
 }
