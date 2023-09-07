@@ -7,37 +7,40 @@ const constant = {
 		enableBoltSwapId: "enable-bolt-swap",
 		enableKnifeSwapId: "enable-knife-swap",
 		enableJavelinSwapId: "enable-javelin-swap",
+		arrowsId: "Arrows",
+		boltsId: "Bolts",
+		knivesId: "Knife",
+		javelinsId: "Javelin",
 	},
 	friendlyTitle: {
 		mod: "Auto Ammunition",
 	},
-	ammoTypeMap: {
-		arrow: "0",
-		bolt: "1",
-		javelin: "2",
-		knife: "3",
-	},
 };
 const ctx = mod.getContext(import.meta);
-let ammoData;
 let modIcon, ammoPouchIcon;
+let ammoData = {},
+	ammoTypeMap = {};
 let swapType = null;
 
-export async function setup({ onInterfaceReady, loadData }) {
+export function setup({ onCharacterLoaded, onInterfaceReady }) {
 	try {
 		setupGlobals();
 		setupSettings();
-		populateAmmoData(loadData);
 		ctx.patch(Character, "initializeForCombat").after(
 			onInitializeForCombat
 		);
 		ctx.patch(Player, "attack").before(onBeforeAttack);
 		ctx.patch(Player, "attack").after(onAfterAttack);
+		onCharacterLoaded(onCharLoaded);
 		onInterfaceReady(onUiReady);
 		log("loaded!");
 	} catch (e) {
 		error(e);
 	}
+}
+
+function onCharLoaded() {
+	populateAmmoData();
 }
 
 function onUiReady() {
@@ -234,16 +237,19 @@ function setupSettings() {
 
 function shouldEquipAmmoOnInitializeCombat() {
 	const ammoType = getAmmoType();
-	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
-	if (ammoType == javelin) return false;
-	if (ammoType == knife) return false;
+	const { arrowsId, boltsId, knivesId, javelinsId } = constant.id;
+
+	if (ammoType == ammoTypeMap[knivesId]) return false;
+	if (ammoType == ammoTypeMap[javelinsId]) return false;
 
 	const quiver = getQuiver();
-	if (ammoType == arrow) {
-		if (equippedAmmoMatchesType(arrow)) return quiver.quantity === 0;
+	const arrowType = ammoTypeMap[arrowsId];
+	const boltType = ammoTypeMap[boltsId];
+	if (ammoType == arrowType) {
+		if (equippedAmmoMatchesType(arrowType)) return quiver.quantity === 0;
 		return true;
-	} else if (ammoType == bolt) {
-		if (equippedAmmoMatchesType(bolt)) return quiver.quantity === 0;
+	} else if (ammoType == boltType) {
+		if (equippedAmmoMatchesType(boltType)) return quiver.quantity === 0;
 		return true;
 	}
 
@@ -254,18 +260,33 @@ function equippedAmmoMatchesType(expectedAmmoType) {
 	return getQuiver().item.ammoType == expectedAmmoType;
 }
 
-async function populateAmmoData(loadData) {
-	try {
-		ammoData = await loadData("src/ammoData.json");
-		ammoData = new Map(Object.entries(ammoData));
-		for (let i = 0; i < ammoData.size; i++) {
-			let ammoDataType = ammoData.get(i + "");
-			for (let j = 0; j < ammoDataType.length; j++) {
-				let item = game.items.getObjectByID(ammoDataType[j + ""]);
-				ammoDataType[j] = item;
-			}
-			ammoData.set(i + "", ammoDataType);
+function populateAmmoData() {
+	const selectEquipment = (loadedAmmo, parsedEquipment) => {
+		for (let i = 0; i < loadedAmmo.length; i++) {
+			let equipmentArray = loadedAmmo[i];
+			parsedEquipment.push(equipmentArray[equipmentArray.length - 1]);
 		}
+	};
+	const selectAmmoType = (equipmentItem) => equipmentItem.ammoType;
+	const setAmmoData = (ammoId, ammo) => (ammoData[ammoId] = ammo);
+	const setAmmoTypeMap = (filter, ammoId) => (ammoTypeMap[filter] = ammoId);
+	const loadAmmoType = (filter) => {
+		let loadedAmmo = Array.from(
+			game.items.equipment.registeredObjects
+		).filter((x) => x[0].includes(filter));
+		let parsedEquipment = [];
+		selectEquipment(loadedAmmo, parsedEquipment);
+		const ammoId = selectAmmoType(parsedEquipment[0]);
+		setAmmoData(ammoId, parsedEquipment);
+		setAmmoTypeMap(filter, ammoId);
+	};
+	try {
+		const { arrowsId, boltsId, knivesId, javelinsId } = constant.id;
+
+		loadAmmoType(arrowsId);
+		loadAmmoType(boltsId);
+		loadAmmoType(knivesId);
+		loadAmmoType(javelinsId);
 	} catch (e) {
 		error(e);
 	}
@@ -307,8 +328,13 @@ function isRangedAttack() {
 
 function autoEquipAmmo() {
 	const ammoType = getAmmoType();
-	const ammoChoices = ammoData
-		.get(ammoType + "")
+	const sortProperty = "rangedStrengthBonus";
+	const ammoChoices = ammoData[ammoType]
+		.sort(
+			(a, b) =>
+				b.equipmentStats.find((x) => x.key === sortProperty).value -
+				a.equipmentStats.find((x) => x.key === sortProperty).value
+		)
 		.filter(
 			(c) =>
 				c.equipRequirements !== null &&
@@ -367,11 +393,13 @@ function shouldAutoSwapJavelins() {
 
 function settingShouldAutoSwap() {
 	const ammoType = getAmmoType();
-	const { arrow, bolt, javelin, knife } = constant.ammoTypeMap;
-	if (ammoType == arrow) return shouldAutoSwapArrows();
-	else if (ammoType == bolt) return shouldAutoSwapBolts();
-	else if (ammoType == javelin) return shouldAutoSwapJavelins();
-	else if (ammoType == knife) return shouldAutoSwapKnives();
+	const { arrowsId, boltsId, knivesId, javelinsId } = constant.id;
+
+	if (ammoType == ammoTypeMap[arrowsId]) return shouldAutoSwapArrows();
+	else if (ammoType == ammoTypeMap[boltsId]) return shouldAutoSwapBolts();
+	else if (ammoType == ammoTypeMap[javelinsId])
+		return shouldAutoSwapJavelins();
+	else if (ammoType == ammoTypeMap[knivesId]) return shouldAutoSwapKnives();
 
 	return false;
 }
