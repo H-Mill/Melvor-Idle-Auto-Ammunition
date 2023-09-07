@@ -1,12 +1,15 @@
 const constant = {
 	modTitle: "Auto Ammo Mod",
-	verson: "1.4.2",
+	verson: "1.5.0",
 	id: {
 		modEnabledId: "mod-enabled",
 		enableArrowSwapId: "enable-arrow-swap",
 		enableBoltSwapId: "enable-bolt-swap",
 		enableKnifeSwapId: "enable-knife-swap",
 		enableJavelinSwapId: "enable-javelin-swap",
+		swapPriorityId: "swap-priority",
+		highToLowId: "highToLow", //this should match friendlyTitle prop
+		lowToHighId: "lowToHigh", //this should match friendlyTitle prop
 		arrowsId: "Arrows",
 		boltsId: "Bolts",
 		knivesId: "Knife",
@@ -14,6 +17,13 @@ const constant = {
 	},
 	friendlyTitle: {
 		mod: "Auto Ammunition",
+		autoArrows: "Auto Arrows",
+		autoBolts: "Auto Bolts",
+		autoKnives: "Auto Knives",
+		autoJavelins: "Auto Javelins",
+		swapPriority: "Swap Priority",
+		highToLow: "High to Low", //this should match id prop
+		lowToHigh: "Low to High", //this should match id prop
 	},
 };
 const ctx = mod.getContext(import.meta);
@@ -52,9 +62,9 @@ function onUiReady() {
 			successModifier = "Enabled",
 			failureModifier = "Disabled"
 		) =>
-			`<p class="text-${success ? "success" : "danger"}">${text}: ${
+			`<p>${text}: <span class="text-${success ? "success" : "danger"}">${
 				success ? successModifier : failureModifier
-			}</p>`;
+			}</span></p>`;
 		const formatInactiveTextIfNeeded = (isPurchased) =>
 			"Enabled" +
 			(!isPurchased
@@ -86,25 +96,30 @@ function onUiReady() {
 							"Not Purchased"
 						)}</p>` +
 						`<p>${getColoredHtml(
-							"Auto Arrows",
+							friendlyTitle.autoArrows,
 							_shouldAutoSwapArrows,
 							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
 						)}</p>` +
 						`<p>${getColoredHtml(
-							"Auto Bolts",
+							friendlyTitle.autoBolts,
 							_shouldAutoSwapBolts,
 							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
 						)}</p>` +
 						`<p>${getColoredHtml(
-							"Auto Knives",
+							friendlyTitle.autoKnives,
 							_shouldAutoSwapKnives,
 							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
 						)}</p>` +
 						`<p>${getColoredHtml(
-							"Auto Javelins",
+							friendlyTitle.autoJavelins,
 							_shouldAutoSwapJavelins,
 							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
-						)}</p>`,
+						)}</p>` +
+						`<p>${
+							friendlyTitle.swapPriority
+						}: <span class="text-success">${
+							constant.friendlyTitle[getSwapPriority()]
+						}</span></p>`,
 					showCloseButton: true,
 				});
 			} catch (e) {
@@ -189,7 +204,19 @@ function setupSettings() {
 			enableBoltSwapId,
 			enableKnifeSwapId,
 			enableJavelinSwapId,
+			swapPriorityId,
+			highToLowId,
+			lowToHighId,
 		} = constant.id;
+		const {
+			autoArrows,
+			autoBolts,
+			autoKnives,
+			autoJavelins,
+			swapPriority,
+			highToLow,
+			lowToHigh,
+		} = constant.friendlyTitle;
 		const generalSection = ctx.settings.section("General");
 		generalSection.add({
 			type: "switch",
@@ -202,7 +229,7 @@ function setupSettings() {
 		generalSection.add({
 			type: "switch",
 			name: enableArrowSwapId,
-			label: "Auto Arrows",
+			label: autoArrows,
 			hint: "Automatically equip arrows during combat when a bow is equipped.",
 			default: true,
 		});
@@ -210,7 +237,7 @@ function setupSettings() {
 		generalSection.add({
 			type: "switch",
 			name: enableBoltSwapId,
-			label: "Auto Bolts",
+			label: autoBolts,
 			hint: "Automatically equip bolts during combat when a crossbow is equipped.",
 			default: true,
 		});
@@ -218,7 +245,7 @@ function setupSettings() {
 		generalSection.add({
 			type: "switch",
 			name: enableKnifeSwapId,
-			label: "Auto Knives",
+			label: autoKnives,
 			hint: "Automatically equip knives during combat when knives are equipped (knives must be manually equipped at the start!).",
 			default: true,
 		});
@@ -226,9 +253,27 @@ function setupSettings() {
 		generalSection.add({
 			type: "switch",
 			name: enableJavelinSwapId,
-			label: "Auto Javelins",
+			label: autoJavelins,
 			hint: "Automatically equip javelins during combat when javelins are equipped (javelins must be manually equipped at the start!).",
 			default: true,
+		});
+
+		generalSection.add({
+			type: "dropdown",
+			name: swapPriorityId,
+			label: swapPriority,
+			hint: "The priority of what order to swap ammunition (high to low, or low to high).",
+			options: [
+				{
+					value: highToLowId,
+					display: highToLow,
+				},
+				{
+					value: lowToHighId,
+					display: lowToHigh,
+				},
+			],
+			default: highToLowId,
 		});
 	} catch (e) {
 		error(e);
@@ -328,13 +373,8 @@ function isRangedAttack() {
 
 function autoEquipAmmo() {
 	const ammoType = getAmmoType();
-	const sortProperty = "rangedStrengthBonus";
 	const ammoChoices = ammoData[ammoType]
-		.sort(
-			(a, b) =>
-				b.equipmentStats.find((x) => x.key === sortProperty).value -
-				a.equipmentStats.find((x) => x.key === sortProperty).value
-		)
+		.sort(getSort())
 		.filter(
 			(c) =>
 				c.equipRequirements !== null &&
@@ -357,6 +397,25 @@ function autoEquipAmmo() {
 	}
 
 	resetSwapType();
+}
+
+function getSort() {
+	const sortProperty = "rangedStrengthBonus";
+	const swapPriority = getSwapPriority();
+	const highToLowSort = (a, b) =>
+		b.equipmentStats.find((x) => x.key === sortProperty).value -
+		a.equipmentStats.find((x) => x.key === sortProperty).value;
+	const lowToHighSort = (a, b) =>
+		a.equipmentStats.find((x) => x.key === sortProperty).value -
+		b.equipmentStats.find((x) => x.key === sortProperty).value;
+	const { highToLowId, lowToHighId } = constant.id;
+	switch (swapPriority) {
+		case highToLowId:
+			return highToLowSort;
+		case lowToHighId:
+			return lowToHighSort;
+	}
+	return highToLowSort;
 }
 
 function getAmmoPouchIcon() {
@@ -389,6 +448,10 @@ function shouldAutoSwapKnives() {
 
 function shouldAutoSwapJavelins() {
 	return getGeneralSettings().get(constant.id.enableJavelinSwapId);
+}
+
+function getSwapPriority() {
+	return getGeneralSettings().get(constant.id.swapPriorityId);
 }
 
 function settingShouldAutoSwap() {
