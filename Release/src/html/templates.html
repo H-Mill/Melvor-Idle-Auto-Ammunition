@@ -1,0 +1,65 @@
+<template id="auto-ammo-settings-template">
+	<div class="d-none">
+		<div class="auto-ammo-settings">
+			<div class="block-header bg-primary-dark">
+				<h3 class="block-title" id="mod-header">{{ modName }}</h3>
+			</div>
+			<div
+				id="auto-ammo-switches"
+				v-scope="Switches(switchesProps)"
+			></div>
+			<div>
+				<div class="block-header border-bottom">
+					<h3 class="block-title">Ammunition Priorities</h3>
+				</div>
+				<div class="block-content" style="padding-top: 12px">
+					<div
+						id="auto-ammo-buttons"
+						v-scope="ItemImgButton(itemImgButtonProps)"
+					></div>
+				</div>
+			</div>
+		</div>
+	</div>
+</template>
+
+<template id="auto-ammo-switches-template">
+	<div id="auto-ammo-switches" v-for="setting in settings" class="mb-4 mr-1">
+		<button
+			:id="setting.id"
+			class="custom-control custom-switch custom-control-lg auto-ammo-switch"
+			@click="switchToggle"
+		>
+			<input
+				class="custom-control-input"
+				type="checkbox"
+				:name="setting.id"
+				:id="setting.id"
+				:checked="setting.value"
+			/><label
+				class="font-weight-normal flex-wrap justify-content-start ml-2 custom-control-label"
+				:for="setting.id"
+				>{{ setting.label }}<span class="ms__force-wrap"></span
+				><small class="d-block">{{ setting.tip }}</small></label
+			><small
+				class="text-danger ms__validation-message validation-message ml-2"
+			></small>
+		</button>
+	</div>
+</template>
+
+<template id="auto-ammo-img-button-template" class="d-none">
+	<div id="auto-ammo-img-button" v-for="ammoType in ammoTypes">
+		<h3 class="block-title">{{ ammoType.ammoType }}</h3>
+		<div
+			v-for="ammo in ammoType"
+			class="btn btn-outline-secondary"
+			:class="ammo.id"
+			:data-ammo="ammo.id"
+			:data-tippy-content="ammo.name"
+			style="margin: 2px; padding: 6px; float: left"
+		>
+			<img :src="ammo.media" width="30" height="30" />
+		</div>
+	</div>
+</template>

@@ -2,5 +2,5 @@
     "namespace": "hm_auto_ammo",
     "icon": "assets/icon.png",
     "setup": "setup.mjs",
-    "load": ["src/autoAmmo.json"]
+    "load": ["src/data/autoAmmo.json", "src/html/templates.html", "src/css/styles.css"]
 }

@@ -8,8 +8,6 @@ const constant = {
 		enableKnifeSwapId: "enable-knife-swap",
 		enableJavelinSwapId: "enable-javelin-swap",
 		swapPriorityId: "swap-priority",
-		highToLowId: "highToLow", //this should match friendlyTitle prop
-		lowToHighId: "lowToHigh", //this should match friendlyTitle prop
 		arrowsId: "Arrows",
 		boltsId: "Bolts",
 		knivesId: "Knife",
@@ -22,17 +20,19 @@ const constant = {
 		autoKnives: "Auto Knives",
 		autoJavelins: "Auto Javelins",
 		swapPriority: "Swap Priority",
-		highToLow: "High to Low", //this should match id prop
-		lowToHigh: "Low to High", //this should match id prop
 	},
 };
 const ctx = mod.getContext(import.meta);
-let modIcon, ammoPouchIcon;
+let modIcon, ammoPouchIcon, settingsModal, characterStorage;
 let ammoData = {},
 	ammoTypeMap = {};
 let swapType = null;
 
-export function setup({ onCharacterLoaded, onInterfaceReady }) {
+export function setup({
+	onCharacterLoaded,
+	onInterfaceReady,
+	characterStorage,
+}) {
 	try {
 		setupGlobals();
 		setupSettings();
@@ -41,7 +41,7 @@ export function setup({ onCharacterLoaded, onInterfaceReady }) {
 		);
 		ctx.patch(Player, "attack").before(onBeforeAttack);
 		ctx.patch(Player, "attack").after(onAfterAttack);
-		onCharacterLoaded(onCharLoaded);
+		onCharacterLoaded(() => onCharLoaded(characterStorage));
 		onInterfaceReady(onUiReady);
 		log("loaded!");
 	} catch (e) {
@@ -49,27 +49,61 @@ export function setup({ onCharacterLoaded, onInterfaceReady }) {
 	}
 }
 
-function onCharLoaded() {
+function onCharLoaded(charStorage) {
 	populateAmmoData();
+	characterStorage = charStorage;
 }
 
 function onUiReady() {
 	try {
-		const { friendlyTitle } = constant;
-		const getColoredHtml = (
-			text,
-			success = false,
-			successModifier = "Enabled",
-			failureModifier = "Disabled"
-		) =>
-			`<p>${text}: <span class="text-${success ? "success" : "danger"}">${
-				success ? successModifier : failureModifier
-			}</span></p>`;
-		const formatInactiveTextIfNeeded = (isPurchased) =>
-			"Enabled" +
-			(!isPurchased
-				? ' <span class="text-danger">(Inactive)</span>'
-				: "");
+		const { friendlyTitle, id } = constant;
+		settingsModal = AutoAmmoSettings({
+			modName: `${friendlyTitle.mod} Settings`,
+			itemImgButtonProps: {
+				ammoTypes: Object.values(ammoData),
+			},
+			switchesProps: {
+				settings: [
+					{
+						id: id.modEnabledId,
+						label: "Mod Enabled",
+						tip: "Enable/Disable mod functionality.",
+						defaultValue: true,
+						value: true,
+					},
+					{
+						id: id.enableArrowSwapId,
+						label: "Auto Arrows",
+						tip: "Automatically equip arrows during combat when a bow is equipped.",
+						defaultValue: true,
+						value: true,
+					},
+					{
+						id: id.enableBoltSwapId,
+						label: "Auto Bolts",
+						tip: "Automatically equip bolts during combat when a crossbow is equipped.",
+						defaultValue: true,
+						value: true,
+					},
+					{
+						id: id.enableKnifeSwapId,
+						label: "Auto Knives",
+						tip: "Automatically equip knives during combat when knives are equipped (knives must be manually equipped at the start!).",
+						defaultValue: true,
+						value: true,
+					},
+					{
+						id: id.enableJavelinSwapId,
+						label: "Auto Javelins",
+						tip: "Automatically equip javelins during combat when javelins are equipped (javelins must be manually equipped at the start!).",
+						defaultValue: true,
+						value: true,
+					},
+				],
+			},
+		});
+		ui.create(settingsModal, document.body);
+
 		let purchasedElement = document.createElement("img");
 		purchasedElement.id = "combat-menu-item-auto-ammo";
 		purchasedElement.src = ammoPouchIcon;
@@ -77,51 +111,7 @@ function onUiReady() {
 			"combat-equip-img border-rounded-equip p-1 m-1 pointer-enabled";
 		purchasedElement.onclick = () => {
 			try {
-				const _isModEnabled = isModEnabled();
-				const _isAutoAmmoPurchased = isAutoAmmoPurchased();
-				const _shouldAutoSwapArrows = shouldAutoSwapArrows();
-				const _shouldAutoSwapBolts = shouldAutoSwapBolts();
-				const _shouldAutoSwapKnives = shouldAutoSwapKnives();
-				const _shouldAutoSwapJavelins = shouldAutoSwapJavelins();
-				Swal.fire({
-					title: friendlyTitle.mod,
-					icon: ammoPouchIcon,
-					html:
-						'<i style="font-size: 0.75rem;">These settings can be modified in the Mod Settings sidebar.</i>' +
-						`<p>${getColoredHtml("Mod", _isModEnabled)}</p>` +
-						`<p>${getColoredHtml(
-							"Upgrade",
-							_isAutoAmmoPurchased,
-							"Purchased",
-							"Not Purchased"
-						)}</p>` +
-						`<p>${getColoredHtml(
-							friendlyTitle.autoArrows,
-							_shouldAutoSwapArrows,
-							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
-						)}</p>` +
-						`<p>${getColoredHtml(
-							friendlyTitle.autoBolts,
-							_shouldAutoSwapBolts,
-							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
-						)}</p>` +
-						`<p>${getColoredHtml(
-							friendlyTitle.autoKnives,
-							_shouldAutoSwapKnives,
-							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
-						)}</p>` +
-						`<p>${getColoredHtml(
-							friendlyTitle.autoJavelins,
-							_shouldAutoSwapJavelins,
-							formatInactiveTextIfNeeded(_isAutoAmmoPurchased)
-						)}</p>` +
-						`<p>${
-							friendlyTitle.swapPriority
-						}: <span class="text-success">${
-							constant.friendlyTitle[getSwapPriority()]
-						}</span></p>`,
-					showCloseButton: true,
-				});
+				showSettingsModal();
 			} catch (e) {
 				error(e);
 			}
@@ -141,6 +131,62 @@ function onUiReady() {
 	} catch (e) {
 		error(e);
 	}
+}
+
+function showSettingsModal() {
+	populateSettingsModal();
+	Swal.fire({
+		html: $(".auto-ammo-settings")
+	}).then(persistSettingUpdates);
+}
+
+function persistSettingUpdates() {
+	let settings = settingsModal.switchesProps.settings;
+	for (let i = 0; i < settings.length; i++) {
+		let setting = settings.at(i);
+		characterStorage.setItem(setting.id, setting.value);
+	}
+}
+
+function populateSettingsModal() {
+	let settings = settingsModal.switchesProps.settings;
+	for (let i = 0; i < settings.length; i++) {
+		let setting = settings.at(i);
+		const storedValue = getSetting(setting.id);
+		setting.value =
+			storedValue === undefined ? setting.defaultValue : storedValue;
+	}
+}
+
+function AutoAmmoSettings(props) {
+	return {
+		$template: "#auto-ammo-settings-template",
+		modName: props.modName,
+		ItemImgButton,
+		itemImgButtonProps: props.itemImgButtonProps,
+		Switches,
+		switchesProps: props.switchesProps,
+	};
+}
+
+function Switches(props) {
+	return {
+		$template: "#auto-ammo-switches-template",
+		settings: props.settings,
+		switchToggle(e) {
+			const switchId = e.target.id;
+			let setting = this.settings.find((x) => x.id === switchId);
+			setting.value = !setting.value;
+			log(JSON.stringify(setting));
+		},
+	};
+}
+
+function ItemImgButton(props) {
+	return {
+		$template: "#auto-ammo-img-button-template",
+		ammoTypes: props.ammoTypes,
+	};
 }
 
 function onInitializeForCombat() {
@@ -198,82 +244,26 @@ function setupGlobals() {
 
 function setupSettings() {
 	try {
-		const {
-			modEnabledId,
-			enableArrowSwapId,
-			enableBoltSwapId,
-			enableKnifeSwapId,
-			enableJavelinSwapId,
-			swapPriorityId,
-			highToLowId,
-			lowToHighId,
-		} = constant.id;
-		const {
-			autoArrows,
-			autoBolts,
-			autoKnives,
-			autoJavelins,
-			swapPriority,
-			highToLow,
-			lowToHigh,
-		} = constant.friendlyTitle;
-		const generalSection = ctx.settings.section("General");
-		generalSection.add({
-			type: "switch",
-			name: modEnabledId,
-			label: "Enable Mod",
-			hint: "Enable mod functionality.",
-			default: true,
-		});
+		const { mod } = constant.friendlyTitle;
+		const modSettingsItem = sidebar
+			.category("Modding")
+			.item("Mod Settings");
 
-		generalSection.add({
-			type: "switch",
-			name: enableArrowSwapId,
-			label: autoArrows,
-			hint: "Automatically equip arrows during combat when a bow is equipped.",
-			default: true,
-		});
-
-		generalSection.add({
-			type: "switch",
-			name: enableBoltSwapId,
-			label: autoBolts,
-			hint: "Automatically equip bolts during combat when a crossbow is equipped.",
-			default: true,
-		});
-
-		generalSection.add({
-			type: "switch",
-			name: enableKnifeSwapId,
-			label: autoKnives,
-			hint: "Automatically equip knives during combat when knives are equipped (knives must be manually equipped at the start!).",
-			default: true,
-		});
-
-		generalSection.add({
-			type: "switch",
-			name: enableJavelinSwapId,
-			label: autoJavelins,
-			hint: "Automatically equip javelins during combat when javelins are equipped (javelins must be manually equipped at the start!).",
-			default: true,
-		});
-
-		generalSection.add({
-			type: "dropdown",
-			name: swapPriorityId,
-			label: swapPriority,
-			hint: "The priority of what order to swap ammunition (high to low, or low to high).",
-			options: [
-				{
-					value: highToLowId,
-					display: highToLow,
-				},
-				{
-					value: lowToHighId,
-					display: lowToHigh,
-				},
-			],
-			default: highToLowId,
+		modSettingsItem.subitem(mod, {
+			name: createElement("span", {
+				children: [
+					createElement("img", {
+						classList: ["mr-2"],
+						attributes: [
+							["src", modIcon],
+							["height", "24"],
+							["width", "24"],
+						],
+					}),
+					mod,
+				],
+			}),
+			onClick: () => showSettingsModal(),
 		});
 	} catch (e) {
 		error(e);
@@ -426,32 +416,62 @@ function getModIcon() {
 	return ctx.getResourceUrl("assets/icon.png");
 }
 
-function getGeneralSettings() {
-	return ctx.settings.section("General");
-}
-
 function isModEnabled() {
-	return getGeneralSettings().get(constant.id.modEnabledId);
+	const { modEnabledId } = constant.id;
+	const setting = getSetting(modEnabledId);
+	return setting === undefined
+		? settingsModal.switchesProps.settings.filter(
+				(x) => x.id === modEnabledId
+		  )
+		: setting;
 }
 
 function shouldAutoSwapArrows() {
-	return getGeneralSettings().get(constant.id.enableArrowSwapId);
+	const { shouldAutoSwapArrows } = constant.id;
+	const setting = getSetting(shouldAutoSwapArrows);
+	return setting === undefined
+		? settingsModal.switchesProps.settings.filter(
+				(x) => x.id === shouldAutoSwapArrows
+		  )
+		: setting;
 }
 
 function shouldAutoSwapBolts() {
-	return getGeneralSettings().get(constant.id.enableBoltSwapId);
+	const { shouldAutoSwapBolts } = constant.id;
+	const setting = getSetting(shouldAutoSwapBolts);
+	return setting === undefined
+		? settingsModal.switchesProps.settings.filter(
+				(x) => x.id === shouldAutoSwapBolts
+		  )
+		: setting;
 }
 
 function shouldAutoSwapKnives() {
-	return getGeneralSettings().get(constant.id.enableKnifeSwapId);
+	const { shouldAutoSwapKnives } = constant.id;
+	const setting = getSetting(shouldAutoSwapKnives);
+	return setting === undefined
+		? settingsModal.switchesProps.settings.filter(
+				(x) => x.id === shouldAutoSwapKnives
+		  )
+		: setting;
 }
 
 function shouldAutoSwapJavelins() {
-	return getGeneralSettings().get(constant.id.enableJavelinSwapId);
+	const { shouldAutoSwapJavelins } = constant.id;
+	const setting = getSetting(shouldAutoSwapJavelins);
+	return setting === undefined
+		? settingsModal.switchesProps.settings.filter(
+				(x) => x.id === shouldAutoSwapJavelins
+		  )
+		: setting;
 }
 
 function getSwapPriority() {
-	return getGeneralSettings().get(constant.id.swapPriorityId);
+	return getSetting(constant.id.swapPriorityId);
+}
+
+function getSetting(id) {
+	return characterStorage.getItem(id);
 }
 
 function settingShouldAutoSwap() {

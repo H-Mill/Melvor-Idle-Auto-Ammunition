@@ -1,0 +1,20 @@
+.auto-ammo-settings {
+    background: rgb(0,0,0,0.5);
+    height: 60vh;
+    overflow-x: hidden;
+}
+
+#auto-ammo-buttons {
+    display: flex;
+    flex-direction: column;
+}
+
+.auto-ammo-switch {
+    display: flex;
+    justify-content: start;
+    text-align: start;
+    background: transparent;
+    border-width: 0;
+    color: white;
+    outline: none;
+}
